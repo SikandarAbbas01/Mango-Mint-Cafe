@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Multimodal adaptive UI: mouse, touch, keyboard, voice and gesture input in a café ordering demo.">
+<title>Mango Mint Café: Multimodal Adaptive UI</title>
+<style>
+body{--b1:#150a3a;--b2:#3a1478;--b3:#1b2a7a;--g1:#ff4d8d;--g2:#2ee6a6;--g3:#ffb703;--pri:#ffb703;--sec:#2ee6a6;--onpri:#150a3a;--glass:rgba(255,255,255,.1);--line:rgba(255,255,255,.22);--ink:#fff;--muted:#d3cbf3;--ring:2px solid var(--sec);--off:2px;--tap:38px;--pad:8px 14px;--fs:.95rem;--gap:10px}
+body[data-theme=sunset]{--b1:#2b0a2e;--b2:#7a1d4a;--b3:#c2410c;--g1:#ffd166;--g2:#ff6b6b;--g3:#f9a8d4;--pri:#ffd166;--sec:#ff9fb8}
+body[data-theme=ocean]{--b1:#021b3a;--b2:#0b4f6c;--b3:#0e7490;--g1:#22d3ee;--g2:#34d399;--g3:#fb7185;--pri:#fb7185;--sec:#5eead4;--onpri:#04121f}
+body[data-theme=contrast]{--b1:#000;--b2:#000;--b3:#000;--g1:#0000;--g2:#0000;--g3:#0000;--pri:#ffe600;--sec:#00ffa2;--onpri:#000;--glass:#000;--line:#fff}
+body[data-mode=touch],body[data-mode=voice]{--tap:56px;--pad:14px 24px;--fs:1.15rem;--gap:16px}
+body[data-mode=keyboard]{--tap:42px;--ring:4px solid var(--pri);--off:3px}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:22px;color:var(--ink);font-family:system-ui,Segoe UI,Arial,sans-serif;line-height:1.45;touch-action:pan-x pan-y;overflow-x:hidden;
+background:radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--g1) 40%,transparent),transparent 42%),radial-gradient(circle at 90% 20%,color-mix(in srgb,var(--g2) 30%,transparent),transparent 40%),radial-gradient(circle at 70% 95%,color-mix(in srgb,var(--g3) 30%,transparent),transparent 40%),linear-gradient(135deg,var(--b1),var(--b2) 55%,var(--b3));background-size:100% 100%,100% 100%,100% 100%,200% 200%;background-attachment:fixed;animation:shift 20s ease-in-out infinite alternate}
+@keyframes shift{to{background-position:0 0,0 0,0 0,100% 100%}}
+body[data-motion=reduce] *{transition:none!important;animation:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+:focus{outline:none}:focus-visible{outline:var(--ring);outline-offset:var(--off)}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+#glow{position:fixed;left:0;top:0;width:300px;height:300px;margin:-150px 0 0 -150px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--sec) 35%,transparent),transparent 65%);pointer-events:none;opacity:0;transition:opacity .3s;z-index:0}
+body[data-mode=mouse] #glow{opacity:1}
+header,.layout{position:relative;z-index:1}
+header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{margin:0;font-size:1.7rem}h1 span{color:var(--pri)}
+h2{font-size:1.05rem;margin:0 0 10px}
+.badge{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border-radius:999px;background:var(--sec);color:var(--onpri);font-weight:700;font-size:.88rem}
+.hd{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(12px);margin-bottom:18px}
+.row{display:flex;flex-wrap:wrap;gap:var(--gap);align-items:center}
+button,input,select{font:inherit;font-size:var(--fs);color:inherit}
+select{background:rgba(0,0,0,.35);border:2px solid var(--line);border-radius:10px;min-height:var(--tap);padding:0 10px}
+option{color:#000}
+.btn{position:relative;overflow:hidden;min-height:var(--tap);padding:var(--pad);border:2px solid var(--pri);background:var(--pri);color:var(--onpri);border-radius:10px;font-weight:700;cursor:pointer;transition:transform .12s,filter .15s}
+.btn:active{transform:scale(.96)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost[aria-pressed=true]{background:var(--sec);color:var(--onpri);border-color:var(--sec)}
+.btn.sq{min-width:var(--tap);padding:0}
+body[data-mode=mouse] .btn:hover{filter:brightness(1.15)}
+.rip{position:absolute;border-radius:50%;background:#fff6;transform:scale(0);animation:rip .6s linear;pointer-events:none}
+@keyframes rip{to{transform:scale(4);opacity:0}}
+input[type=search],input[type=text]{min-height:var(--tap);padding:var(--pad);border-radius:10px;border:2px solid var(--line);background:rgba(0,0,0,.3);flex:1;min-width:140px}
+input::placeholder{color:var(--muted)}
+#mic.on{background:var(--g1);border-color:var(--g1);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 12px #ff4d8d33}}
+#vbar{display:none;margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(0,0,0,.4);border:1px solid var(--sec);position:relative;z-index:1}
+#vbar.on{display:block}
+.menu{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--gap);margin-top:12px;perspective:800px}
+body[data-mode=touch] .menu,body[data-mode=voice] .menu{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.item{position:relative;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center;display:flex;flex-direction:column;gap:6px;transition:transform .2s,background .2s;touch-action:pan-y;user-select:none;animation:pop .4s backwards}
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.95)}}
+.item .e{font-size:2.4rem;transition:transform .3s}
+body[data-mode=mouse] .item:hover .e{transform:scale(1.25) rotate(-8deg)}
+.item .p{color:var(--pri);font-weight:800}
+.item .btn{margin-top:auto}
+.fav{position:absolute;right:8px;top:6px;background:none;border:0;font-size:1.3rem;cursor:pointer;min-width:36px;min-height:36px}
+.cart-row{display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);touch-action:pan-y;transition:transform .2s}
+.cart-row .n{flex:1}.qty{min-width:2ch;text-align:center;font-weight:700}
+.rm{display:none}
+body[data-mode=touch] .rm,body[data-mode=keyboard] .rm,body[data-mode=voice] .rm,body[data-mode=mouse] .cart-row:hover .rm{display:inline-flex}
+.line{display:flex;justify-content:space-between;color:var(--muted)}
+.tot{display:flex;justify-content:space-between;font-size:1.3rem;font-weight:800;margin:8px 0 12px}.tot span:last-child{color:var(--sec)}
+.empty{color:var(--muted);padding:10px 0}
+.help{display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.3);font-size:.85rem;color:var(--muted)}
+body[data-mode=mouse] .h-mouse,body[data-mode=touch] .h-touch,body[data-mode=keyboard] .h-keyboard,body[data-mode=voice] .h-voice{display:block}
+kbd{background:rgba(255,255,255,.2);border-radius:4px;padding:0 6px}
+label.sw{display:flex;gap:10px;align-items:center;min-height:var(--tap)}
+label.sw input{width:22px;height:22px;accent-color:var(--sec)}
+input[type=range]{accent-color:var(--sec);width:100%;height:var(--tap)}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;text-align:center;font-size:.72rem;margin-bottom:8px}
+.stats div{border:1px solid var(--line);border-radius:8px;padding:6px 2px}.stats b{display:block;font-size:1.1rem}
+ol.log{margin:0;padding-left:18px;font-size:.8rem;color:var(--muted);max-height:120px;overflow:auto}
+dialog{border:1px solid var(--sec);border-radius:16px;background:var(--b1);color:var(--ink);max-width:min(92vw,460px)}
+dialog::backdrop{background:#000a;backdrop-filter:blur(4px)}
+#toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,140px);background:var(--sec);color:var(--onpri);font-weight:700;padding:12px 18px;border-radius:12px;transition:transform .25s;z-index:9;max-width:92vw}
+#toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body data-mode="mouse" data-theme="aurora">
+<canvas id="fx" aria-hidden="true"></canvas><div id="glow" aria-hidden="true"></div>
+
+<header>
+  <h1>Mango <span>Mint</span> Café</h1>
+  <div class="hd">
+    <select id="theme" aria-label="Theme">
+      <option value="auto">Theme: Auto</option><option value="aurora">Aurora</option><option value="sunset">Sunset</option><option value="ocean">Ocean</option><option value="contrast">High contrast</option>
+    </select>
+    <button class="btn" id="mic" aria-pressed="false">🎤 Voice</button>
+    <button class="btn ghost" id="helpBtn" aria-label="Help and shortcuts">?</button>
+    <div class="badge" role="status" aria-live="polite" id="badge">Mode: Mouse</div>
+  </div>
+</header>
+<div id="vbar" role="status"><b>Listening…</b> <span id="heard">Try “add two mango latte”, “show drinks”, “place order”.</span></div>
+
+<div class="layout">
+<main>
+  <section class="panel" aria-labelledby="mh">
+    <h2 id="mh">Menu</h2>
+    <input type="search" id="q" placeholder="Search the menu  (press / )" aria-label="Search the menu" style="width:100%">
+    <div class="row" id="cats" role="group" aria-label="Categories" style="margin-top:10px"></div>
+    <div class="menu" id="menu"></div>
+    <div class="help h-touch">Gestures: swipe a card right to add · double-tap to favourite · long-press for details · pinch to resize text.</div>
+    <div class="help h-mouse">Mouse: cards tilt on hover · double-click to favourite · right-click for details.</div>
+    <div class="help h-keyboard"><kbd>Tab</kbd> move · <kbd>Enter</kbd> add · <kbd>/</kbd> search · <kbd>Alt</kbd>+<kbd>M</kbd> mode · <kbd>Alt</kbd>+<kbd>V</kbd> voice · <kbd>Alt</kbd>+<kbd>T</kbd> theme · <kbd>?</kbd> help</div>
+    <div class="help h-voice">Voice mode: speak commands. Say “help” to hear what you can say.</div>
+  </section>
+  <section class="panel" aria-labelledby="hh"><h2 id="hh">Recent orders</h2><div id="hist"></div></section>
+</main>
+
+<aside>
+  <section class="panel" aria-labelledby="ch">
+    <h2 id="ch">Your order</h2>
+    <div id="cart"></div>
+    <div class="row" style="margin:8px 0"><input type="text" id="promo" placeholder="Promo code (try MANGO10)" aria-label="Promo code"><button class="btn ghost" id="applyPromo">Apply</button></div>
+    <div class="row" id="tips" role="group" aria-label="Tip"></div>
+    <div style="margin-top:10px">
+      <div class="line"><span>Subtotal</span><span id="sub">$0.00</span></div>
+      <div class="line"><span>Discount</span><span id="disc">-$0.00</span></div>
+      <div class="line"><span>Tip</span><span id="tipv">$0.00</span></div>
+    </div>
+    <div class="tot"><span>Total</span><span id="total">$0.00</span></div>
+    <div class="row"><button class="btn" id="place">Place order</button><button class="btn ghost" id="clear">Clear</button><button class="btn ghost" id="readBtn">🔊 Read</button></div>
+  </section>
+
+  <section class="panel" aria-labelledby="sh">
+    <h2 id="sh">Adaptive settings</h2>
+    <div class="row" id="modes" role="group" aria-label="Input mode"></div>
+    <p style="margin:12px 0 0">Text size: <span id="scaleOut">100</span>%</p>
+    <input type="range" id="scale" min="85" max="150" step="5" value="100" aria-label="Text size">
+    <label class="sw"><input type="checkbox" id="motion"> Reduce motion and effects</label>
+    <label class="sw"><input type="checkbox" id="sound"> Sound feedback</label>
+    <label class="sw"><input type="checkbox" id="speak"> Spoken replies</label>
+    <button class="btn ghost" id="reset">Reset everything</button>
+  </section>
+
+  <section class="panel" aria-labelledby="lh">
+    <h2 id="lh">Live input monitor</h2>
+    <div class="stats"><div><b id="c-mouse">0</b>mouse</div><div><b id="c-touch">0</b>touch</div><div><b id="c-keyboard">0</b>keys</div><div><b id="c-voice">0</b>voice</div><div><b id="c-gesture">0</b>gesture</div></div>
+    <ol class="log" id="log" aria-label="Recent input events"></ol>
+  </section>
+</aside>
+</div>
+
+<dialog id="dlg"></dialog>
+<dialog id="helpDlg">
+  <h2>Shortcuts and voice commands</h2>
+  <p><b>Keys:</b> / search · Alt+M mode · Alt+V voice · Alt+T theme · + / − text size · ? help</p>
+  <p><b>Gestures:</b> swipe card right = add · swipe order line left = remove · double-tap = favourite · long-press = details · pinch = text size</p>
+  <p><b>Voice:</b> “add two mango latte” · “remove donut” · “show drinks” · “search brownie” · “apply promo” · “tip ten” · “ocean theme” · “bigger text” · “read order” · “place order” · “clear” · “stop listening”</p>
+  <form method="dialog"><button class="btn">Close</button></form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const MENU=[
+{n:'Mango Latte',e:'🥭',p:4.5,c:'Drinks',cal:210,d:'Espresso, steamed milk and sweet mango purée.'},
+{n:'Mint Mojito',e:'🍃',p:3.8,c:'Drinks',cal:90,d:'Fresh mint, lime and sparkling water. No alcohol.'},
+{n:'Berry Smoothie',e:'🍓',p:5,c:'Drinks',cal:240,d:'Strawberry, blueberry and yoghurt blended thick.'},
+{n:'Iced Coffee',e:'🧊',p:3.5,c:'Drinks',cal:60,d:'Cold-brewed for 12 hours, served over ice.'},
+{n:'Green Tea',e:'🍵',p:2.9,c:'Drinks',cal:5,d:'Sencha leaves, lightly steamed and fragrant.'},
+{n:'Club Sandwich',e:'🥪',p:6.9,c:'Food',cal:520,d:'Triple-decker with chicken, egg and crisp lettuce.'},
+{n:'Veggie Wrap',e:'🌯',p:6.2,c:'Food',cal:410,d:'Hummus, roasted peppers and fresh greens.'},
+{n:'Avocado Toast',e:'🥑',p:5.9,c:'Food',cal:350,d:'Sourdough, smashed avocado, chilli flakes.'},
+{n:'Choc Brownie',e:'🍫',p:3.2,c:'Sweets',cal:380,d:'Fudgy centre with a crackly top.'},
+{n:'Donut',e:'🍩',p:2.6,c:'Sweets',cal:290,d:'Glazed ring, baked fresh every morning.'},
+{n:'Cheesecake',e:'🍰',p:4.8,c:'Sweets',cal:430,d:'New York style with a berry swirl.'},
+{n:'Mango Sorbet',e:'🍨',p:3.9,c:'Sweets',cal:150,d:'Dairy-free and made from ripe mangoes.'}];
+const CATS=['All','Drinks','Food','Sweets','Favourites'],TIPS=[0,.05,.1,.15];
+let S={override:'auto',scale:100,motion:false,theme:'auto',sound:true,speak:false},cat='All',cart={},favs=[],hist=[],promo=false,tip=0,mode=null,lastTouch=0,listening=false;
+try{const j=JSON.parse(localStorage.getItem('cafe2')||'{}');Object.assign(S,j.S);cart=j.cart||{};favs=j.favs||[];hist=j.hist||[]}catch(e){}
+const persist=()=>{try{localStorage.setItem('cafe2',JSON.stringify({S,cart,favs,hist}))}catch(e){}};
+const money=n=>'$'+n.toFixed(2),rm=()=>S.motion||matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+/* feedback */
+let tt,ac;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600)}
+function beep(f=660,d=.08){if(!S.sound)return;try{ac=ac||new(window.AudioContext||webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.value=.05;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+const buzz=p=>{if(mode==='touch'&&navigator.vibrate)navigator.vibrate(p)};
+function say(t){toast(t);if(S.speak&&window.speechSynthesis){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(t))}}
+const C={mouse:0,touch:0,keyboard:0,voice:0,gesture:0};
+function note(k,m){C[k]++;$('c-'+k).textContent=C[k];const li=document.createElement('li');li.textContent=new Date().toLocaleTimeString()+' · '+m;$('log').prepend(li);while($('log').children.length>25)$('log').lastChild.remove()}
+
+/* mode engine */
+const LABEL={mouse:'Mouse',touch:'Touch',keyboard:'Keyboard',voice:'Voice'};
+const auto=()=>S.override==='auto';
+function setMode(m,why){if(m===mode)return;mode=m;document.body.dataset.mode=m;$('badge').textContent='Mode: '+LABEL[m];note(m,'Mode → '+LABEL[m]+(why?' ('+why+')':''))}
+addEventListener('pointerdown',e=>{if(!auto())return;if(e.pointerType!=='mouse'){lastTouch=Date.now();setMode('touch','tap')}else if(Date.now()-lastTouch>800)setMode('mouse','click')},true);
+addEventListener('pointermove',e=>{
+  if(e.pointerType==='mouse'){$('glow').style.transform=`translate(${e.clientX}px,${e.clientY}px)`;if(auto()&&Date.now()-lastTouch>800&&!listening)setMode('mouse','pointer')}},true);
+addEventListener('keydown',e=>{
+  const typing=/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
+  if(e.altKey){const k=e.key.toLowerCase();
+    if(k==='m'){e.preventDefault();const o=['auto','mouse','touch','keyboard'];S.override=o[(o.indexOf(S.override)+1)%4];persist();applyMode();toast('Input mode: '+(S.override==='auto'?'Automatic':LABEL[S.override]));return}
+    if(k==='v'){e.preventDefault();toggleVoice();return}
+    if(k==='t'){e.preventDefault();const o=['auto','aurora','sunset','ocean','contrast'];S.theme=o[(o.indexOf(S.theme)+1)%5];persist();applyPrefs();toast('Theme: '+S.theme);return}}
+  if(!typing){
+    if(e.key==='/'){e.preventDefault();$('q').focus();return}
+    if(e.key==='?'){$('helpDlg').showModal();return}
+    if(e.key==='+'||e.key==='='){S.scale=Math.min(150,S.scale+5);persist();applyPrefs();return}
+    if(e.key==='-'){S.scale=Math.max(85,S.scale-5);persist();applyPrefs();return}}
+  if(auto()&&(e.key==='Tab'||(!typing&&e.key.startsWith('Arrow'))))setMode('keyboard',e.key)},true);
+function applyMode(){[...$('modes').children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===S.override));
+  setMode(S.override!=='auto'?S.override:(listening?'voice':matchMedia('(pointer:coarse)').matches?'touch':'mouse'),'setting')}
+['auto','mouse','touch','keyboard'].forEach(v=>{const b=document.createElement('button');b.className='btn ghost';b.dataset.v=v;b.textContent=v==='auto'?'Auto':LABEL[v];b.onclick=()=>{S.override=v;persist();applyMode()};$('modes').appendChild(b)});
+
+/* prefs */
+function applyPrefs(){
+  document.documentElement.style.fontSize=S.scale+'%';$('scale').value=S.scale;$('scaleOut').textContent=S.scale;
+  const t=S.theme==='auto'?(matchMedia('(prefers-contrast:more)').matches?'contrast':'aurora'):S.theme;
+  document.body.dataset.theme=t;$('theme').value=S.theme;
+  document.body.dataset.motion=S.motion?'reduce':'';
+  ['motion','sound','speak'].forEach(k=>$(k).checked=S[k])}
+$('scale').oninput=e=>{S.scale=+e.target.value;persist();applyPrefs()};
+$('theme').onchange=e=>{S.theme=e.target.value;persist();applyPrefs()};
+['motion','sound','speak'].forEach(k=>$(k).onchange=e=>{S[k]=e.target.checked;persist();applyPrefs()});
+$('reset').onclick=()=>{S={override:'auto',scale:100,motion:false,theme:'auto',sound:true,speak:false};cart={};favs=[];hist=[];promo=false;tip=0;persist();applyPrefs();applyMode();renderAll();toast('Everything reset')};
+$('helpBtn').onclick=()=>$('helpDlg').showModal();
+
+/* ripple */
+document.addEventListener('pointerdown',e=>{const b=e.target.closest('.btn');if(!b||rm())return;const r=b.getBoundingClientRect(),s=Math.max(r.width,r.height),i=document.createElement('span');i.className='rip';i.style.cssText=`width:${s}px;height:${s}px;left:${e.clientX-r.left-s/2}px;top:${e.clientY-r.top-s/2}px`;b.appendChild(i);setTimeout(()=>i.remove(),600)});
+
+/* gestures */
+function gest(el,o){let x0=null,y0,lp,last=0;
+  el.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')return;x0=e.clientX;y0=e.clientY;lp=setTimeout(()=>{x0=null;o.drag&&o.drag(0);o.long&&o.long()},550)});
+  el.addEventListener('pointermove',e=>{if(x0===null)return;const dx=e.clientX-x0;if(Math.abs(dx)>10)clearTimeout(lp);o.drag&&o.drag(dx)});
+  el.addEventListener('pointerup',e=>{clearTimeout(lp);if(x0===null)return;const dx=e.clientX-x0,dy=e.clientY-y0;x0=null;o.drag&&o.drag(0);
+    if(Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5){dx<0?o.left&&o.left():o.right&&o.right()}
+    else if(Math.abs(dx)<10&&Math.abs(dy)<10){if(Date.now()-last<320){o.dbl&&o.dbl();last=0}else last=Date.now()}});
+  el.addEventListener('pointercancel',()=>{clearTimeout(lp);x0=null;o.drag&&o.drag(0)})}
+const ptr=new Map();let d0=null,s0=100;const dist=()=>{const[a,b]=[...ptr.values()];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)};
+addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){ptr.set(e.pointerId,e);if(ptr.size===2){d0=dist();s0=S.scale}}});
+addEventListener('pointermove',e=>{if(ptr.has(e.pointerId)){ptr.set(e.pointerId,e);if(ptr.size===2&&d0){S.scale=Math.max(85,Math.min(150,Math.round(s0*dist()/d0/5)*5));applyPrefs()}}});
+['pointerup','pointercancel'].forEach(t=>addEventListener(t,e=>{ptr.delete(e.pointerId);if(ptr.size<2&&d0){d0=null;persist();note('gesture','Pinch → text '+S.scale+'%')}}));
+
+/* menu */
+CATS.forEach(c=>{const b=document.createElement('button');b.className='btn ghost';b.textContent=c;b.dataset.c=c;b.onclick=()=>{cat=c;renderMenu()};$('cats').appendChild(b)});
+$('q').oninput=renderMenu;
+function add(n,q=1){cart[n]=(cart[n]||0)+q;persist();renderCart();beep(720);buzz(20)}
+function toggleFav(n){const i=favs.indexOf(n);i<0?favs.push(n):favs.splice(i,1);persist();renderMenu();toast((i<0?'♥ Added to':'Removed from')+' favourites: '+n)}
+function detail(m){const d=$('dlg');d.innerHTML=`<div style="text-align:center"><div style="font-size:3.4rem">${m.e}</div><h2>${m.n}</h2><p>${m.d}</p><p>${m.cal} kcal · ${money(m.p)}</p></div><form method="dialog" class="row" style="justify-content:center"><button class="btn" value="add">Add to order</button><button class="btn ghost">Close</button></form>`;
+  d.onclose=()=>{if(d.returnValue==='add')add(m.n)};d.returnValue='';d.showModal()}
+function renderMenu(){
+  [...$('cats').children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===cat));
+  const q=$('q').value.trim().toLowerCase(),list=MENU.filter(m=>(cat==='All'||m.c===cat||(cat==='Favourites'&&favs.includes(m.n)))&&m.n.toLowerCase().includes(q));
+  const box=$('menu');box.innerHTML='';
+  if(!list.length){box.innerHTML='<p class="empty">Nothing matches. Try another word or category.</p>';return}
+  list.forEach((m,i)=>{const d=document.createElement('div');d.className='item';d.style.animationDelay=i*40+'ms';
+    d.innerHTML=`<button class="fav" aria-label="Favourite ${m.n}" aria-pressed="${favs.includes(m.n)}">${favs.includes(m.n)?'♥':'♡'}</button><div class="e">${m.e}</div><b>${m.n}</b><div class="p">${money(m.p)}</div>`;
+    d.querySelector('.fav').onclick=()=>toggleFav(m.n);
+    const b=document.createElement('button');b.className='btn';b.textContent='Add to order';b.setAttribute('aria-label','Add '+m.n+' to order');b.onclick=()=>{add(m.n);toast(m.n+' added')};d.appendChild(b);
+    d.ondblclick=()=>toggleFav(m.n);d.oncontextmenu=e=>{e.preventDefault();detail(m)};
+    gest(d,{drag:dx=>{d.style.transform=dx?`translateX(${dx*.5}px)`:''},right:()=>{add(m.n);note('gesture','Swipe right → add '+m.n);say(m.n+' added')},dbl:()=>{note('gesture','Double-tap → favourite');toggleFav(m.n)},long:()=>{note('gesture','Long-press → details');buzz(40);detail(m)}});
+    box.appendChild(d)})}
+$('menu').addEventListener('mousemove',e=>{if(mode!=='mouse'||rm())return;const it=e.target.closest('.item');if(!it)return;const r=it.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;it.style.transform=`rotateY(${x*14}deg) rotateX(${-y*14}deg) translateY(-4px)`});
+$('menu').addEventListener('mouseout',e=>{const it=e.target.closest('.item');if(it&&mode==='mouse')it.style.transform=''});
+
+/* cart */
+const calc=()=>{const sub=Object.keys(cart).reduce((s,n)=>s+MENU.find(m=>m.n===n).p*cart[n],0),disc=promo?sub*.1:0,tp=(sub-disc)*tip;return{sub,disc,tp,total:sub-disc+tp}};
+function change(n,d){cart[n]=(cart[n]||0)+d;if(cart[n]<=0)delete cart[n];persist();renderCart()}
+function renderCart(){const box=$('cart');box.innerHTML='';const names=Object.keys(cart);
+  if(!names.length)box.innerHTML='<p class="empty">Your order is empty. Add something from the menu.</p>';
+  names.forEach(n=>{const m=MENU.find(x=>x.n===n),r=document.createElement('div');r.className='cart-row';
+    r.innerHTML=`<span class="n">${m.e} ${n}</span><button class="btn ghost sq" aria-label="Fewer ${n}">−</button><span class="qty">${cart[n]}</span><button class="btn ghost sq" aria-label="More ${n}">+</button><button class="btn ghost sq rm" aria-label="Remove ${n}">✕</button>`;
+    const[a,b,c]=r.querySelectorAll('button');a.onclick=()=>change(n,-1);b.onclick=()=>change(n,1);c.onclick=()=>{delete cart[n];persist();renderCart()};
+    gest(r,{drag:dx=>{r.style.transform=dx<0?`translateX(${dx}px)`:''},left:()=>{delete cart[n];persist();renderCart();note('gesture','Swipe left → remove '+n);buzz(30)}});
+    box.appendChild(r)});
+  const t=calc();$('sub').textContent=money(t.sub);$('disc').textContent='-'+money(t.disc);$('tipv').textContent=money(t.tp);$('total').textContent=money(t.total)}
+TIPS.forEach(v=>{const b=document.createElement('button');b.className='btn ghost';b.textContent=v?'Tip '+Math.round(v*100)+'%':'No tip';b.dataset.v=v;b.onclick=()=>{tip=v;tipUI();renderCart()};$('tips').appendChild(b)});
+const tipUI=()=>[...$('tips').children].forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===tip));
+function usePromo(code){if(code.trim().toUpperCase()==='MANGO10'){promo=true;renderCart();say('Promo applied: 10 percent off');beep(880)}else say('That code is not valid. Try MANGO10.')}
+$('applyPromo').onclick=()=>usePromo($('promo').value);
+$('clear').onclick=()=>{cart={};persist();renderCart()};
+$('readBtn').onclick=readOrder;
+function readOrder(){const n=Object.keys(cart);if(!n.length)return say('Your order is empty.');const t=calc(),was=S.speak;S.speak=true;say('You have '+n.map(k=>cart[k]+' '+k).join(', ')+'. Total '+t.total.toFixed(2)+' dollars.');S.speak=was}
+function place(){if(!Object.keys(cart).length)return say('Add an item before placing your order.');
+  const t=calc(),id=Math.floor(1000+Math.random()*9000);hist.unshift({id,items:{...cart},total:t.total});hist=hist.slice(0,5);
+  cart={};promo=false;persist();renderAll();confetti();beep(520,.1);setTimeout(()=>beep(780,.15),110);buzz([40,40,80]);say('Order '+id+' placed. Total '+money(t.total))}
+$('place').onclick=place;
+function renderHist(){const h=$('hist');h.innerHTML=hist.length?'':'<p class="empty">No orders yet. Your last five will appear here.</p>';
+  hist.forEach(o=>{const r=document.createElement('div');r.className='cart-row';r.innerHTML=`<span class="n">#${o.id} · ${Object.keys(o.items).length} items · ${money(o.total)}</span>`;
+    const b=document.createElement('button');b.className='btn ghost';b.textContent='Reorder';b.onclick=()=>{Object.entries(o.items).forEach(([n,q])=>cart[n]=(cart[n]||0)+q);persist();renderCart();toast('Order #'+o.id+' added again')};r.appendChild(b);h.appendChild(r)})}
+function renderAll(){renderMenu();renderCart();renderHist();tipUI()}
+
+/* voice */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
+const NUM={one:1,two:2,three:3,four:4,five:5};
+function find(t){return MENU.find(m=>t.includes(m.n.toLowerCase()))||MENU.find(m=>m.n.toLowerCase().split(' ').some(w=>w.length>3&&t.includes(w)))}
+function command(t){note('voice','“'+t+'”');const m=find(t),q=(t.match(/\b(\d|one|two|three|four|five)\b/)||[])[1],qty=q?(NUM[q]||+q):1;
+  if(/stop listening|stop voice/.test(t))return toggleVoice();
+  if(/^help|what can i say/.test(t))return say('Try: add two mango latte, show drinks, tip ten, ocean theme, place order.');
+  if(/place order|checkout|check out/.test(t))return place();
+  if(/clear/.test(t)){cart={};persist();renderCart();return say('Order cleared.')}
+  if(/read/.test(t))return readOrder();
+  if(/promo|discount|coupon/.test(t))return usePromo('MANGO10');
+  const tp=t.match(/tip (zero|no|five|ten|fifteen|0|5|10|15)/);if(tp){tip={zero:0,no:0,'0':0,five:.05,'5':.05,ten:.1,'10':.1,fifteen:.15,'15':.15}[tp[1]];tipUI();renderCart();return say('Tip set.')}
+  const th=t.match(/(aurora|sunset|ocean|contrast|dark) theme|theme (aurora|sunset|ocean|contrast)/);if(th){S.theme=(th[1]||th[2]).replace('dark','ocean');persist();applyPrefs();return say('Theme: '+S.theme)}
+  if(/bigger|larger|increase/.test(t)&&/text|size/.test(t)){S.scale=Math.min(150,S.scale+15);persist();applyPrefs();return say('Text enlarged.')}
+  if(/smaller|decrease/.test(t)&&/text|size/.test(t)){S.scale=Math.max(85,S.scale-15);persist();applyPrefs();return say('Text reduced.')}
+  const sc=t.match(/show (all|drinks|food|sweets|favourites|favorites)/);if(sc){cat=sc[1].replace('favorites','favourites').replace(/^./,c=>c.toUpperCase());renderMenu();return say('Showing '+cat)}
+  const se=t.match(/search (?:for )?(.+)/);if(se){$('q').value=se[1];renderMenu();return say('Searching '+se[1])}
+  if(/remove|delete/.test(t)&&m){delete cart[m.n];persist();renderCart();return say(m.n+' removed.')}
+  if(/add|order|i want|i'll have|get me/.test(t)&&m){add(m.n,qty);return say(qty+' '+m.n+' added.')}
+  say('Sorry, I did not catch that. Say “help” for ideas.')}
+function voiceUI(on){$('mic').classList.toggle('on',on);$('mic').setAttribute('aria-pressed',on);$('mic').textContent=on?'⏹ Stop':'🎤 Voice';$('vbar').classList.toggle('on',on)}
+function toggleVoice(){
+  if(!SR)return toast('Voice needs Chrome, Edge or Safari. Mouse, touch and keyboard still work.');
+  if(listening){listening=false;rec.stop();voiceUI(false);if(auto())applyMode();return toast('Voice off')}
+  rec=new SR();rec.lang='en-US';rec.continuous=true;rec.interimResults=true;
+  rec.onresult=e=>{const r=e.results[e.results.length-1];$('heard').textContent='“'+r[0].transcript+'”';if(r.isFinal)command(r[0].transcript.toLowerCase().trim())};
+  rec.onend=()=>{if(listening)try{rec.start()}catch(e){}};
+  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){listening=false;voiceUI(false);toast('Microphone blocked. Allow access in your browser settings.')}};
+  try{rec.start()}catch(e){return}
+  listening=true;voiceUI(true);if(auto())setMode('voice','mic on')}
+$('mic').onclick=toggleVoice;
+
+/* effects: floating bokeh + confetti */
+const cv=$('fx'),cx=cv.getContext('2d');let W,H,P=[],K=[];
+const size=()=>{W=cv.width=innerWidth;H=cv.height=innerHeight};size();addEventListener('resize',size);
+for(let i=0;i<40;i++)P.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:3+Math.random()*9,vx:(Math.random()-.5)*.3,vy:-.15-Math.random()*.4,h:Math.random()*360});
+function confetti(){if(rm())return;const cs=['--pri','--sec','--g1','--g2','--g3'].map(v=>getComputedStyle(document.body).getPropertyValue(v).trim());
+  for(let i=0;i<140;i++)K.push({x:W/2,y:H*.6,vx:(Math.random()-.5)*16,vy:-8-Math.random()*10,s:5+Math.random()*6,c:cs[i%5],a:Math.random()*6,va:(Math.random()-.5)*.4})}
+(function frame(){cx.clearRect(0,0,W,H);
+  if(!rm()){P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.y<-20){p.y=H+20;p.x=Math.random()*W}cx.beginPath();cx.arc(p.x,p.y,p.r,0,7);cx.fillStyle=`hsla(${p.h},90%,75%,.16)`;cx.fill()});
+    K=K.filter(k=>k.y<H+20);K.forEach(k=>{k.x+=k.vx;k.y+=k.vy;k.vy+=.35;k.vx*=.99;k.a+=k.va;cx.save();cx.translate(k.x,k.y);cx.rotate(k.a);cx.fillStyle=k.c;cx.fillRect(-k.s/2,-k.s/2,k.s,k.s*.6);cx.restore()})}
+  requestAnimationFrame(frame)})();
+
+/* init */
+matchMedia('(pointer:coarse)').addEventListener('change',()=>auto()&&applyMode());
+matchMedia('(prefers-contrast:more)').addEventListener('change',applyPrefs);
+applyPrefs();applyMode();renderAll();
+</script>
+</body>
+</html>
